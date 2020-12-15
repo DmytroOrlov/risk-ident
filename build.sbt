@@ -50,7 +50,7 @@ val commonSettings = Seq(
   scalaVersion := "2.13.4",
 )
 
-lazy val `risk-ident` = (project in file("."))
+lazy val `risk-ident-upload` = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
   .settings(commonSettings)
   .settings(
