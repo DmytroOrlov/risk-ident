@@ -94,3 +94,10 @@ lazy val macros = project
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     scalacOptions += "-language:experimental.macros",
   )
+
+lazy val `provided-test-service` = project
+  .enablePlugins(DockerPlugin, JavaAppPackaging)
+  .disablePlugins(RevolverPlugin)
+  .settings(
+    mainClass in Compile := Some("de.riskident.Main"),
+  )

@@ -1,7 +1,22 @@
+## Package provided test service for integration tests
+```sh
+$ sbt provided-test-service/docker:publishLocal
+```
+## Run provided test service
+```sh
+$ java -jar provided-test-service/lib/coding-challenge.jar
+```
+or with Sbt
+```sh
+$ sbt provided-test-service/run
+```
+or in Docker
+```sh
+$ sbt provided-test-service/docker:publishLocal && \
+    docker run --rm -p 8080:8080 provided-test-service:1.0-SNAPSHOT
+```
 ## Developing in Sbt
 ```sh
 $ sbt
 > ~reStart
 ```
-## Open Swagger UI
-[http://localhost:8080/docs](http://localhost:8080/docs)
