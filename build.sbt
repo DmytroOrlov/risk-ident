@@ -9,7 +9,7 @@ val V = new {
   val zio = "1.0.3"
   val distage = "0.10.19"
   val tapir = "0.16.16"
-  val sttp = "2.1.5"
+  val sttp = "2.2.9"
   val elastic4s = "7.9.2"
 
   val scalacheck = "1.15.1"
@@ -35,7 +35,7 @@ val Deps = new {
   val tapirSwaggerUiHttp4s = "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-http4s" % V.tapir
 
   val sttpClientCirce = "com.softwaremill.sttp.client" %% "circe" % V.sttp
-  val asyncHttpClientBackendZio = "com.softwaremill.sttp.client" %% "async-http-client-backend-zio-streams" % V.sttp
+  val asyncHttpClientBackendZio = "com.softwaremill.sttp.client" %% "async-http-client-backend-zio" % V.sttp
 
   val elastic4sClientSttp = "com.sksamuel.elastic4s" %% "elastic4s-client-sttp" % V.elastic4s
   val elastic4sEffectZio = "com.sksamuel.elastic4s" %% "elastic4s-effect-zio" % V.elastic4s

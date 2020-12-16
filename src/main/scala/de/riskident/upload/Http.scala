@@ -3,18 +3,21 @@ package de.riskident.upload
 import capture.Capture
 import capture.Capture.Constructors
 import sttp.client._
-import sttp.client.asynchttpclient.ziostreams.AsyncHttpClientZioStreamsBackend
+import sttp.client.asynchttpclient.zio._
 import zio.macros.accessible
+import zio.stream.Stream
 import zio.{IO, Task, UIO}
+
+import java.nio.ByteBuffer
 
 @accessible
 trait Sttp {
-  def backend: UIO[SttpBackend[Task, S, NothingT]]
+  def backend: UIO[SttpBackend[Task, Stream[Throwable, Byte], NothingT]]
 }
 
 object Sttp {
   val make =
-    AsyncHttpClientZioStreamsBackend.managed().map { impl =>
+    AsyncHttpClientZioBackend.managed().map { impl =>
       new Sttp {
         val backend = IO.succeed(impl)
       }
@@ -23,7 +26,7 @@ object Sttp {
 
 @accessible
 trait Http {
-  def request: UIO[RequestT[Identity, S, S]]
+  def request: UIO[RequestT[Identity, Stream[Throwable, Byte], Stream[Throwable, Byte]]]
 }
 
 object Http {
@@ -31,7 +34,7 @@ object Http {
     val request = IO.succeed {
       basicRequest
         .get(uri"${cfg.url}/${cfg.downloadLines}")
-        .response(ResponseAsStream[S, S]())
+        .response(ResponseAsStream[Stream[Throwable, Byte], Stream[Throwable, Byte]]())
         .readTimeout(cfg.requestTimeout)
     }
   }
@@ -39,30 +42,21 @@ object Http {
 
 trait HttpErr[+A] {
   def throwable(message: String)(e: Throwable): A
-
-  def message(message: String): A
 }
 
 object HttpErr extends Constructors[HttpErr] {
   def throwable(message: String)(e: Throwable) =
     Capture[HttpErr](_.throwable(message)(e))
 
-  def message(message: String) =
-    Capture[HttpErr](_.message(message))
-
   val asThrowable = new AsThrowable {}
 
   trait AsThrowable extends HttpErr[Throwable] {
     def throwable(message: String)(e: Throwable) = new RuntimeException(s"$message: ${e.getMessage}")
-
-    def message(message: String) = new RuntimeException(message)
   }
 
 
   trait AsString extends HttpErr[String] {
     def throwable(message: String)(e: Throwable) = s"$message: ${e.getMessage}"
-
-    def message(message: String) = message
   }
 
 }
