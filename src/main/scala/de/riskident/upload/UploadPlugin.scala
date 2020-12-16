@@ -17,7 +17,7 @@ object UploadPlugin extends PluginDef with ConfigModuleDef {
 
   makeConfig[AppCfg]("app")
   make[Sttp].fromResource(Sttp.make)
-  make[Http].from(Http.make _)
+  make[HttpDownloader].from(HttpDownloader.make _)
   make[Console.Service].fromHas(Console.live)
   make[Task[Unit]].from(
     provideHas(

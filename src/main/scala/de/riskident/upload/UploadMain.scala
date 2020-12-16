@@ -52,7 +52,7 @@ object UploadMain extends App {
 
   val program = for {
     implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.backend
-    httpRequest <- Http.request
+    httpRequest <- HttpDownloader.request
     (code, bytes) <- (httpRequest.send(): Task[Response[Stream[Throwable, Byte]]]).bimap(throwable("httpRequest.send"), r => r.code -> r.body)
     _ <- IO.fail(downloadMoreLines(code))
       .when(!code.isSuccess)
@@ -97,7 +97,8 @@ object UploadMain extends App {
 
 case class AppCfg(
     downloadLines: Int,
-    url: URI,
+    downloadUrl: URI,
+    uploadUrl: URI,
     requestTimeout: Duration,
 )
 

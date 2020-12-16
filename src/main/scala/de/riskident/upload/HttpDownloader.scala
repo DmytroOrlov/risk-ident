@@ -8,8 +8,6 @@ import zio.macros.accessible
 import zio.stream.Stream
 import zio.{IO, Task, UIO}
 
-import java.nio.ByteBuffer
-
 @accessible
 trait Sttp {
   def backend: UIO[SttpBackend[Task, Stream[Throwable, Byte], NothingT]]
@@ -25,19 +23,36 @@ object Sttp {
 }
 
 @accessible
-trait Http {
+trait HttpDownloader {
   def request: UIO[RequestT[Identity, Stream[Throwable, Byte], Stream[Throwable, Byte]]]
 }
 
-object Http {
-  def make(cfg: AppCfg) = new Http {
+object HttpDownloader {
+  def make(cfg: AppCfg) = new HttpDownloader {
     val request = IO.succeed {
       basicRequest
-        .get(uri"${cfg.url}/${cfg.downloadLines}")
+        .get(uri"${cfg.downloadUrl}/${cfg.downloadLines}")
         .response(ResponseAsStream[Stream[Throwable, Byte], Stream[Throwable, Byte]]())
         .readTimeout(cfg.requestTimeout)
     }
   }
+}
+
+@accessible
+trait HttpUploader {
+  def request(lines: Long): UIO[RequestT[Identity, Either[String, String], Stream[Nothing, String]]]
+}
+
+object HttpUploader {
+  def make(cfg: AppCfg) =
+    new HttpUploader {
+      def request(lines: Long) = IO.succeed {
+        basicRequest
+          .streamBody(Stream.succeed("produktId|name|beschreibung|preis|summeBestand"))
+          .contentType("text/csv")
+          .put(uri"${cfg.uploadUrl}/$lines")
+      }
+    }
 }
 
 trait HttpErr[+A] {
