@@ -7,7 +7,7 @@ import distage.{HasConstructor, ProviderMagnet, Tag}
 import izumi.distage.config.AppConfigModule
 import izumi.distage.plugins.PluginDef
 import zio._
-import zio.console._
+import zio.blocking._
 
 object UploadPlugin extends PluginDef with ConfigModuleDef {
   def provideHas[R: HasConstructor, A: Tag](fn: R => A): ProviderMagnet[A] =
@@ -19,7 +19,7 @@ object UploadPlugin extends PluginDef with ConfigModuleDef {
   make[Sttp].fromResource(Sttp.make)
   make[HttpDownloader].from(HttpDownloader.make _)
   make[HttpUploader].from(HttpUploader.make _)
-  make[Console.Service].fromHas(Console.live)
+  make[Blocking.Service].fromHas(Blocking.live)
   make[Task[Unit]].from(
     provideHas(
       program

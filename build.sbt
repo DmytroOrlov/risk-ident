@@ -7,6 +7,7 @@ ThisBuild / scalacOptions ++= Seq(
 val V = new {
   val zioInteropCats = "2.2.0.1"
   val zio = "1.0.3"
+  val zioNio = "1.0.0-RC10"
   val distage = "0.10.19"
   val tapir = "0.16.16"
   val sttp = "2.2.9"
@@ -23,6 +24,7 @@ val V = new {
 val Deps = new {
   val zioInteropCats = "dev.zio" %% "zio-interop-cats" % V.zioInteropCats
   val zio = "dev.zio" %% "zio" % V.zio
+  val zioNio = "dev.zio" %% "zio-nio" % V.zioNio
   val distageFramework = "io.7mind.izumi" %% "distage-framework" % V.distage
   val distageFrameworkDocker = "io.7mind.izumi" %% "distage-framework-docker" % V.distage
   val distageTestkitScalatest = "io.7mind.izumi" %% "distage-testkit-scalatest" % V.distage
@@ -55,6 +57,7 @@ lazy val `risk-ident-upload` = (project in file("."))
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
+      Deps.zioNio,
       Deps.zio,
       Deps.zioInteropCats,
       Deps.logstageAdapterSlf4J,

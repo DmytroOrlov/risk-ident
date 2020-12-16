@@ -4,16 +4,20 @@ import capture.Capture
 import capture.Capture.Constructors
 import cats.syntax.show._
 import de.riskident.upload.HttpErr._
-import de.riskident.upload.UploadErr.downloadMoreLines
+import de.riskident.upload.UploadErr.{downloadMoreLines, failedUpload}
 import distage._
 import izumi.distage.plugins.PluginConfig
 import izumi.distage.plugins.load.PluginLoader
 import sttp.client.{NothingT, Response, SttpBackend}
 import sttp.model.StatusCode
 import zio._
+import zio.blocking.Blocking
+import zio.nio.channels.AsynchronousFileChannel
+import zio.nio.file.Files
 import zio.stream.{Stream, ZTransducer}
 
 import java.net.URI
+import java.nio.file.{Path, StandardOpenOption}
 import scala.concurrent.duration.Duration
 
 object UploadMain extends App {
@@ -52,7 +56,7 @@ object UploadMain extends App {
 
   val program = for {
     implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.backend
-    cfg <- ZIO.service[AppCfg]
+    env <- ZIO.environment[Blocking]
     httpRequest <- HttpDownloader.request
     (code, bytes) <- (httpRequest.send(): Task[Response[Stream[Throwable, Byte]]]).bimap(throwable("httpRequest.send"), r => r.code -> r.body)
     _ <- IO.fail(downloadMoreLines(code))
@@ -74,13 +78,36 @@ object UploadMain extends App {
         }
       }
       .aggregate(destLineTransducer)
-    _ <- (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
-      destLineStream.map(_.show)).foreach { l =>
-      UIO(println(l))
-    }.mapError(throwable("destLineStream.foreach"))
-    //.mapConcatChunk(d => Chunk.fromArray(("\n" + d.show).getBytes))
-    //    uploadRequest <- HttpUploader.request(cfg.downloadLines)
-    //    _ <- uploadRequest.streamBody(destLineStream).send().mapError(throwable("uploadRequest.send"))
+    _ <- (for {
+      tempFile <- Files.createTempFile(prefix = None, fileAttributes = Iterable.empty)
+        .mapError(throwable("createTempFile"))
+      uploadLines <- AsynchronousFileChannel.open(
+        tempFile,
+        StandardOpenOption.TRUNCATE_EXISTING,
+        StandardOpenOption.WRITE,
+      ).mapError(throwable(s"write $tempFile")).use { channel =>
+        var filePosition = 0
+        var lines = -1
+        (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
+          destLineStream.map(d => s"\n${d.show}"))
+          .foreach { s =>
+            lines = lines + 1
+            channel.writeChunk(Chunk.fromArray(s.getBytes), filePosition)
+              .map(written => filePosition += written)
+          }.bimap(throwable("destLineStream.foreach"), _ => lines)
+      }
+    } yield tempFile -> uploadLines)
+      .toManaged { case (p, _) => Files.delete(p).ignore }
+      .use { case (tempFile, uploadLines) =>
+        for {
+          uploadRequest <- HttpUploader.request(uploadLines)
+          (code, body) <- uploadRequest
+            .streamBody(Stream.fromFile(Path.of(tempFile.toString)).provide(env))
+            .send().bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
+          _ <- IO.fail(failedUpload(code, body.toString))
+            .when(!code.isSuccess)
+        } yield ()
+      }
   } yield ()
 
   def run(args: List[String]) = {
@@ -108,6 +135,8 @@ case class AppCfg(
 trait UploadErr[+A] {
   def downloadMoreLines(code: StatusCode): A
 
+  def failedUpload(code: StatusCode, body: String): A
+
   def message(message: String): A
 }
 
@@ -118,9 +147,15 @@ object UploadErr extends Constructors[UploadErr] {
   def downloadMoreLines(code: StatusCode) =
     Capture[UploadErr](_.downloadMoreLines(code))
 
+  def failedUpload(code: StatusCode, body: String) =
+    Capture[UploadErr](_.failedUpload(code, body))
+
   trait AsThrowable extends UploadErr[Throwable] {
     def downloadMoreLines(code: StatusCode) =
       new RuntimeException(s"not all entries could be processed, download more lines, http code: $code")
+
+    def failedUpload(code: StatusCode, body: String) =
+      new RuntimeException(s"failed upload: code: $code, body: $body")
 
     def message(message: String) = new RuntimeException(message)
   }
