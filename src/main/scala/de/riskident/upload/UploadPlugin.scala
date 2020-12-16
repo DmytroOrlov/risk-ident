@@ -1,6 +1,7 @@
 package de.riskident.upload
 
 import com.typesafe.config.ConfigFactory
+import de.riskident.upload.HttpErr.asThrowable
 import de.riskident.upload.UploadMain.program
 import distage.config.ConfigModuleDef
 import distage.{HasConstructor, ProviderMagnet, Tag}
@@ -19,5 +20,5 @@ object UploadPlugin extends PluginDef with ConfigModuleDef {
   make[Sttp].fromResource(Sttp.make)
   make[Http].from(Http.make _)
   make[Console.Service].fromHas(Console.live)
-  make[UIO[Unit]].from(provideHas(program.provide))
+  make[Task[Unit]].from(provideHas(program.mapError(_ continue asThrowable).provide))
 }
