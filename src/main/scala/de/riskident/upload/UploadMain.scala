@@ -1,35 +1,42 @@
 package de.riskident.upload
 
-import com.typesafe.config.ConfigFactory
-import distage.config.ConfigModuleDef
-import distage.{Tag, _}
-import izumi.distage.config.AppConfigModule
+import distage._
+import izumi.distage.plugins.PluginConfig
+import izumi.distage.plugins.load.PluginLoader
+import sttp.client.{NothingT, SttpBackend}
 import zio._
 import zio.console._
 
 import java.net.URI
+import scala.concurrent.duration.Duration
 
 object UploadMain extends App {
+  val program = for {
+    implicit0(sttpBackend: SttpBackend[Task, S, NothingT]) <- Sttp.backend
+    httpRequest <- Http.request
+    _ <- httpRequest.send()
+    _ <- Http.request
+    cfg <- ZIO.service[AppCfg]
+    _ <- putStrLn(cfg.downloadLines.toString)
+  } yield ()
+
   def run(args: List[String]) = {
-    val program = for {
-      cfg <- ZIO.service[AppCfg]
-      _ <- putStrLn(cfg.downloadLines.toString)
-    } yield ()
+    val pluginConfig = PluginConfig.cached(
+      packagesEnabled = Seq(
+        "de.riskident.upload",
+      )
+    )
+    val appModules = PluginLoader().load(pluginConfig)
 
-    def provideHas[R: HasConstructor, A: Tag](fn: R => A): Functoid[A] =
-      HasConstructor[R].map(fn)
-
-    val definition = new ConfigModuleDef {
-      makeConfig[AppCfg]("app")
-      make[UIO[Unit]].from(provideHas(program.provide))
-    }
-
-    val defs = Seq(definition, AppConfigModule(ConfigFactory.defaultApplication()))
-    Injector[Task]()
-      .produceGet[UIO[Unit]](defs.merge)
+    Injector()
+      .produceGetF[Task, UIO[Unit]](appModules.merge)
       .useEffect
       .exitCode
   }
 }
 
-case class AppCfg(downloadLines: URI)
+case class AppCfg(
+    downloadLines: Int,
+    url: URI,
+    requestTimeout: Duration,
+)
