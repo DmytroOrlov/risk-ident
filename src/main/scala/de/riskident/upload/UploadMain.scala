@@ -2,6 +2,7 @@ package de.riskident.upload
 
 import capture.Capture
 import capture.Capture.Constructors
+import cats.syntax.show._
 import de.riskident.upload.HttpErr._
 import de.riskident.upload.UploadErr.downloadMoreLines
 import distage._
@@ -16,7 +17,7 @@ import java.net.URI
 import scala.concurrent.duration.Duration
 
 object UploadMain extends App {
-  val toDestLine: ZTransducer[Any, Nothing, SourceLine, DestLine] =
+  val destLineTransducer: ZTransducer[Any, Nothing, SourceLine, DestLine] =
     ZTransducer[Any, Nothing, SourceLine, DestLine] {
       def destLines(leftovers: Chunk[SourceLine]) =
         if (leftovers.isEmpty) Chunk.empty
@@ -55,23 +56,25 @@ object UploadMain extends App {
     (code, bytes) <- (httpRequest.send(): Task[Response[Stream[Throwable, Byte]]]).bimap(throwable("httpRequest.send"), r => r.code -> r.body)
     _ <- IO.fail(downloadMoreLines(code))
       .when(!code.isSuccess)
-    _ <- bytes
-      .aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines)
-      .drop(1)
-      .bimap(throwable("splitLines SourceLine"), {
-        _.split("\\|").toList match {
-          case id :: produktId :: name :: description :: price :: stock :: _ =>
-            SourceLine(
-              id,
-              produktId,
-              name,
-              description,
-              BigDecimal(price),
-              stock.toInt
-            )
-        }
-      })
-      .aggregate(toDestLine)
+    _ <- (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
+      bytes
+        .aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines)
+        .drop(1)
+        .bimap(throwable("splitLines SourceLine"), {
+          _.split("\\|").toList match {
+            case id :: produktId :: name :: description :: price :: stock :: _ =>
+              SourceLine(
+                id,
+                produktId,
+                name,
+                description,
+                BigDecimal(price),
+                stock.toInt
+              )
+          }
+        })
+        .aggregate(destLineTransducer)
+        .map(_.show))
       .foreach { l =>
         UIO(println(l))
       }
@@ -91,23 +94,6 @@ object UploadMain extends App {
       .exitCode
   }
 }
-
-case class SourceLine(
-    id: String,
-    produktId: String,
-    name: String,
-    description: String,
-    price: BigDecimal,
-    stock: Int,
-)
-
-case class DestLine(
-    produktId: String,
-    name: String,
-    description: String,
-    price: BigDecimal,
-    stockSum: Int,
-)
 
 case class AppCfg(
     downloadLines: Int,
