@@ -16,6 +16,39 @@ import java.net.URI
 import scala.concurrent.duration.Duration
 
 object UploadMain extends App {
+  val toDestLine: ZTransducer[Any, Nothing, SourceLine, DestLine] =
+    ZTransducer[Any, Nothing, SourceLine, DestLine] {
+      def destLines(leftovers: Chunk[SourceLine]) =
+        if (leftovers.isEmpty) Chunk.empty
+        else
+          Chunk.fromIterable(leftovers.groupBy(_.produktId).values.flatMap { articles =>
+            val sum = articles.map(_.stock).sum
+            if (sum == 0) Iterable.empty
+            else Iterable({
+              val res = articles.filterNot(_.stock == 0).minBy(_.price)
+              DestLine(res.produktId, res.name, res.description, res.price, sum)
+            })
+          })
+
+      ZRef.makeManaged[Chunk[SourceLine]](Chunk.empty).map(stateRef => {
+        case None =>
+          stateRef.getAndSet(Chunk.empty).flatMap { leftovers =>
+            ZIO.succeed(destLines(leftovers))
+          }
+
+        case Some(ss) =>
+          stateRef.modify { leftovers =>
+            val concat = leftovers ++ ss
+
+            if (concat.map(_.produktId).distinct.length < 2) (Chunk.empty, concat.materialize)
+            else {
+              val (newLeftovers, toConvert) = concat.partition(_.produktId == concat.last.produktId)
+              (destLines(toConvert), newLeftovers.materialize)
+            }
+          }
+      })
+    }
+
   val program = for {
     implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.backend
     httpRequest <- Http.request
@@ -38,6 +71,7 @@ object UploadMain extends App {
             )
         }
       })
+      .aggregate(toDestLine)
       .foreach { l =>
         UIO(println(l))
       }
@@ -72,7 +106,6 @@ case class DestLine(
     name: String,
     description: String,
     price: BigDecimal,
-    stock: Int,
     stockSum: Int,
 )
 
