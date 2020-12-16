@@ -10,7 +10,7 @@ import izumi.distage.plugins.load.PluginLoader
 import sttp.client.{NothingT, Response, SttpBackend}
 import sttp.model.StatusCode
 import zio._
-import zio.stream.{Stream, ZSink, ZTransducer}
+import zio.stream.{Stream, ZTransducer}
 
 import java.net.URI
 import scala.concurrent.duration.Duration
@@ -25,9 +25,22 @@ object UploadMain extends App {
     _ <- bytes
       .aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines)
       .drop(1)
-      .foreach { s =>
-        UIO(println(s">>> $s"))
-      }.mapError(throwable("splitLines.foreach"))
+      .bimap(throwable("splitLines SourceLine"), {
+        _.split("\\|").toList match {
+          case id :: produktId :: name :: description :: price :: stock :: _ =>
+            SourceLine(
+              id,
+              produktId,
+              name,
+              description,
+              BigDecimal(price),
+              stock.toInt
+            )
+        }
+      })
+      .foreach { l =>
+        UIO(println(l))
+      }
   } yield ()
 
   def run(args: List[String]) = {
@@ -44,6 +57,24 @@ object UploadMain extends App {
       .exitCode
   }
 }
+
+case class SourceLine(
+    id: String,
+    produktId: String,
+    name: String,
+    description: String,
+    price: BigDecimal,
+    stock: Int,
+)
+
+case class DestLine(
+    produktId: String,
+    name: String,
+    description: String,
+    price: BigDecimal,
+    stock: Int,
+    stockSum: Int,
+)
 
 case class AppCfg(
     downloadLines: Int,
