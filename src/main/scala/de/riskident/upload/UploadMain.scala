@@ -52,32 +52,35 @@ object UploadMain extends App {
 
   val program = for {
     implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.backend
+    cfg <- ZIO.service[AppCfg]
     httpRequest <- HttpDownloader.request
     (code, bytes) <- (httpRequest.send(): Task[Response[Stream[Throwable, Byte]]]).bimap(throwable("httpRequest.send"), r => r.code -> r.body)
     _ <- IO.fail(downloadMoreLines(code))
       .when(!code.isSuccess)
-    _ <- (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
-      bytes
-        .aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines)
-        .drop(1)
-        .bimap(throwable("splitLines SourceLine"), {
-          _.split("\\|").toList match {
-            case id :: produktId :: name :: description :: price :: stock :: _ =>
-              SourceLine(
-                id,
-                produktId,
-                name,
-                description,
-                BigDecimal(price),
-                stock.toInt
-              )
-          }
-        })
-        .aggregate(destLineTransducer)
-        .map(_.show))
-      .foreach { l =>
-        UIO(println(l))
+    destLineStream = bytes
+      .aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines)
+      .drop(1)
+      .map {
+        _.split("\\|").toList match {
+          case id :: produktId :: name :: description :: price :: stock :: _ =>
+            SourceLine(
+              id,
+              produktId,
+              name,
+              description,
+              BigDecimal(price),
+              stock.toInt
+            )
+        }
       }
+      .aggregate(destLineTransducer)
+    _ <- (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
+      destLineStream.map(_.show)).foreach { l =>
+      UIO(println(l))
+    }.mapError(throwable("destLineStream.foreach"))
+    //.mapConcatChunk(d => Chunk.fromArray(("\n" + d.show).getBytes))
+    //    uploadRequest <- HttpUploader.request(cfg.downloadLines)
+    //    _ <- uploadRequest.streamBody(destLineStream).send().mapError(throwable("uploadRequest.send"))
   } yield ()
 
   def run(args: List[String]) = {

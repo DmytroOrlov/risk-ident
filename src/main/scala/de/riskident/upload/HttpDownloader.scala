@@ -40,7 +40,7 @@ object HttpDownloader {
 
 @accessible
 trait HttpUploader {
-  def request(lines: Long): UIO[RequestT[Identity, Either[String, String], Stream[Nothing, String]]]
+  def request(lines: Long): UIO[RequestT[Identity, Either[String, String], Nothing]]
 }
 
 object HttpUploader {
@@ -48,7 +48,6 @@ object HttpUploader {
     new HttpUploader {
       def request(lines: Long) = IO.succeed {
         basicRequest
-          .streamBody(Stream.succeed("produktId|name|beschreibung|preis|summeBestand"))
           .contentType("text/csv")
           .put(uri"${cfg.uploadUrl}/$lines")
       }
