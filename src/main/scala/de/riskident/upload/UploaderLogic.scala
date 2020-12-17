@@ -25,16 +25,6 @@ object UploaderLogic {
         if (leftovers.isEmpty) Chunk.empty
         else
           Chunk.fromIterable({
-            /*
-              leftovers.groupBy(_.produktId).values.flatMap { articles =>
-                val sum = articles.map(_.stock).sum
-                if (sum == 0) Iterable.empty
-                else Iterable({
-                  val s = articles.filterNot(_.stock == 0).minBy(_.price)
-                  DestLine(s.produktId, s.name, s.description, s.price, sum)
-                })
-              }
-            */
             leftovers.foldLeft(List.empty[DestLine]) {
               case (Nil, s) if s.stock != 0 =>
                 DestLine(s.produktId, s.name, s.description, s.price, s.stock) :: Nil
