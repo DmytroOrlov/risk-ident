@@ -69,9 +69,7 @@ object UploaderLogic {
     }
 
   val make = for {
-    env <- ZIO.environment[Has[HttpUploader] with Has[Downloader] with Blocking]
-    cfg <- ZIO.service[AppCfg]
-    noContentTypeCharsetBackend <- Sttp.noContentTypeCharsetBackend
+    env <- ZIO.environment[Has[Uploader] with Has[Downloader] with Blocking]
   } yield new UploaderLogic {
     def downloadUpload =
       (for {
@@ -97,40 +95,9 @@ object UploaderLogic {
           .aggregate(destLineTransducer)
         byteStream = (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
           destLineStream.map(d => s"\n${d.show}")).mapConcat(_.getBytes)
-        _ <- (for {
-          /*
-          tempFile <- Files.createTempFile(prefix = None, fileAttributes = Iterable.empty)
-            .mapError(throwable("createTempFile"))
-          uploadLines <- AsynchronousFileChannel.open(
-            tempFile,
-            StandardOpenOption.TRUNCATE_EXISTING,
-            StandardOpenOption.WRITE,
-          ).mapError(throwable(s"write $tempFile")).use { channel =>
-            var filePosition = 0
-            var lines = -1
-            stringStream
-              .foreach { s =>
-                lines = lines + 1
-                channel.writeChunk(Chunk.fromArray(s.getBytes), filePosition)
-                  .map(written => filePosition += written)
-              }.bimap(throwable("destLineStream.foreach"), _ => lines)
-          }
-        } yield tempFile -> uploadLines)
-          .toManaged { case (p, _) => Files.delete(p).ignore }
-          .use { case (tempFile, uploadLines) =>
-            for {
-          */
-          _ <- IO.unit
-          implicit0(sttpBackend: SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]) = noContentTypeCharsetBackend
-          uploadRequest <- HttpUploader.request(cfg.downloadLines)
-          (code, body) <- uploadRequest
-            // .streamBody(Stream.fromFile(Path.of(tempFile.toString)).provide(env))
-            .streamBody(byteStream)
-            .send()
-            .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
-          _ <- IO.fail(failedUpload(code, body.toString))
-            .when(!code.isSuccess)
-        } yield ())
+        (code, body) <- Uploader.upload(byteStream)
+        _ <- IO.fail(failedUpload(code, body.toString))
+          .when(!code.isSuccess)
       } yield ()) provide env
   }
 }

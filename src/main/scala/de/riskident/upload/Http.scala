@@ -9,7 +9,7 @@ import sttp.client.httpclient.zio.{BlockingTask, HttpClientZioBackend}
 import sttp.model.{MediaType, StatusCode}
 import zio.blocking.Blocking
 import zio.macros.accessible
-import zio.stream.{Stream, ZStream}
+import zio.stream.{Stream, UStream, ZStream}
 import zio.{IO, Task, UIO, ZIO}
 
 @accessible
@@ -59,6 +59,28 @@ object HttpDownloader {
         .response(ResponseAsStream[Stream[Throwable, Byte], Stream[Throwable, Byte]]())
         .readTimeout(cfg.requestTimeout)
     }
+  }
+}
+
+@accessible
+trait Uploader {
+  def upload(bytes: Stream[Throwable, Byte]): IO[Capture[HttpErr], (StatusCode, Either[String, String])]
+}
+
+object Uploader {
+  val make = for {
+    implicit0(sttpBackend: SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]) <- Sttp.noContentTypeCharsetBackend
+    env <- ZIO.environment[Blocking]
+    cfg <- ZIO.service[AppCfg]
+    uploadRequest <- HttpUploader.request(cfg.downloadLines)
+  } yield new Uploader {
+    def upload(bytes: Stream[Throwable, Byte]) =
+      (for {
+        res <- uploadRequest
+          .streamBody(bytes)
+          .send()
+          .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
+      } yield res) provide env
   }
 }
 

@@ -18,6 +18,7 @@ object UploadPlugin extends PluginDef with ConfigModuleDef with ZIODIEffectModul
   makeConfig[AppCfg]("app")
   make[Sttp].fromHas(Sttp.make)
   make[Downloader].fromHas(Downloader.make)
+  make[Uploader].fromHas(Uploader.make)
   make[HttpDownloader].from(HttpDownloader.make _)
   make[HttpUploader].from(HttpUploader.make _)
   make[UploaderLogic].fromHas(UploaderLogic.make)

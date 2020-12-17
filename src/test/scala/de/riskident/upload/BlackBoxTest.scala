@@ -10,7 +10,7 @@ import sttp.client._
 import sttp.model.StatusCode
 import zio._
 import zio.blocking.Blocking
-import zio.stream.Stream
+import zio.stream._
 
 abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionValues with EitherValues with TypeCheckedTripleEquals {
   "UploaderLogic" should {
@@ -24,6 +24,8 @@ abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionV
 }
 
 final class DummyBlackBoxTest extends BlackBoxTest {
+  def streamReduce(a: String, b: String): String = a + b
+
   override def config: TestConfig = super.config.copy(
     moduleOverrides = new ModuleDef {
       make[Downloader].fromHas(for {
@@ -31,6 +33,19 @@ final class DummyBlackBoxTest extends BlackBoxTest {
         res = Stream.fromResource("200.csv") provide env
       } yield new Downloader {
         def download = IO.succeed(StatusCode.Ok -> res)
+      })
+      make[Uploader].fromHas(for {
+        env <- ZIO.environment[Blocking]
+        orig <- Stream.fromResource("200-resp.csv").aggregate(ZTransducer.utf8Decode).run(Sink.foldLeft("")(streamReduce)) provide env
+      } yield new Uploader {
+        def upload(bytes: Stream[Throwable, Byte]) =
+          (for {
+            res <- bytes.aggregate(ZTransducer.utf8Decode).run(Sink.foldLeft("")(streamReduce))
+            _ <- IO {
+              assert(res === orig)
+            }
+          } yield StatusCode.Ok -> Right("ok"))
+            .mapError(HttpErr.throwable("res to orig"))
       })
     }
   )
