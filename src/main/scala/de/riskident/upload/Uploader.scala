@@ -38,7 +38,7 @@ object Uploader {
             leftovers.foldLeft(List.empty[DestLine]) {
               case (Nil, s) if s.stock != 0 =>
                 DestLine(s.produktId, s.name, s.description, s.price, s.stock) :: Nil
-              case (a :: acc, s) if a.produktId == s.produktId && s.price < a.price =>
+              case (a :: acc, s) if a.produktId == s.produktId && s.price < a.price && s.stock != 0 =>
                 DestLine(s.produktId, s.name, s.description, s.price, s.stock + a.stockSum) :: acc
               case (a :: acc, s) if a.produktId == s.produktId =>
                 a.copy(stockSum = a.stockSum + s.stock) :: acc

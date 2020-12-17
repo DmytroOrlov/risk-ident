@@ -1,5 +1,5 @@
 ThisBuild / organization := "com.example"
-ThisBuild / version := "1.0-SNAPSHOT"
+ThisBuild / version := "1.1-SNAPSHOT"
 ThisBuild / scalacOptions ++= Seq(
   "-Ymacro-annotations",
 )
@@ -106,4 +106,5 @@ lazy val `provided-test-service` = project
   .settings(
     mainClass in Compile := Some("de.riskident.Main"),
     dockerExposedPorts := Seq(8080),
+    dockerRepository := None,
   )

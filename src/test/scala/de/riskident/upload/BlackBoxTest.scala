@@ -11,7 +11,7 @@ import zio._
 
 abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionValues with EitherValues with TypeCheckedTripleEquals {
   "Uploader" should {
-    "upload 50" in {
+    "successfully upload all entries" in {
       (for {
         _ <- Uploader.upload
       } yield ())
@@ -23,12 +23,18 @@ abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionV
 final class DockerBlackBoxTest extends BlackBoxTest {
   override def config: TestConfig = super.config.copy(
     moduleOverrides = new ModuleDef {
-      make[AppCfg].fromEffect { (service: TestDockerSvc) =>
-        import scala.concurrent.duration._
+      make[AppCfg].fromHas { (service: TestDockerSvc) =>
         for {
           downloadUrl <- Task(uri"http://${service.test.hostV4}:${service.test.port}/articles")
           uploadUrl <- Task(uri"http://${service.test.hostV4}:${service.test.port}/products")
-        } yield AppCfg(50, downloadUrl.toJavaUri, uploadUrl.toJavaUri, 10.seconds)
+          _ <- {
+            import zio.duration._
+            ZIO.sleep(5.seconds)
+          }
+        } yield {
+          import scala.concurrent.duration._
+          AppCfg(200, downloadUrl.toJavaUri, uploadUrl.toJavaUri, 10.seconds)
+        }
       }
     },
     memoizationRoots = Set(

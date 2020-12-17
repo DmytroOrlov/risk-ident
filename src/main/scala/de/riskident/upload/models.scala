@@ -22,6 +22,6 @@ case class DestLine(
 object DestLine {
   implicit val `Show[DestLine]`: Show[DestLine] = Show.show {
     case l@DestLine(produktId, name, description, price, stockSum) =>
-      (produktId :: name :: description :: price :: stockSum :: Nil).mkString("|")
+      (produktId :: name :: description :: f"$price%.2f" :: stockSum :: Nil).mkString("|")
   }
 }
