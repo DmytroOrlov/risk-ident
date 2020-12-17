@@ -16,7 +16,7 @@ object UploadPlugin extends PluginDef with ConfigModuleDef {
   include(AppConfigModule(ConfigFactory.defaultApplication()))
 
   makeConfig[AppCfg]("app")
-  make[Sttp].fromResource(Sttp.make)
+  make[Sttp].fromHas(Sttp.make)
   make[HttpDownloader].from(HttpDownloader.make _)
   make[HttpUploader].from(HttpUploader.make _)
   make[Blocking.Service].fromHas(Blocking.live)

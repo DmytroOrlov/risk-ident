@@ -8,13 +8,14 @@ import de.riskident.upload.UploadErr.{downloadMoreLines, failedUpload}
 import distage._
 import izumi.distage.plugins.PluginConfig
 import izumi.distage.plugins.load.PluginLoader
+import sttp.client.httpclient.zio.BlockingTask
 import sttp.client.{NothingT, Response, SttpBackend}
-import sttp.model.StatusCode
+import sttp.model.{MediaType, StatusCode}
 import zio._
 import zio.blocking.Blocking
 import zio.nio.channels.AsynchronousFileChannel
 import zio.nio.file.Files
-import zio.stream.{Stream, ZTransducer}
+import zio.stream.{Stream, ZStream, ZTransducer}
 
 import java.net.URI
 import java.nio.file.{Path, StandardOpenOption}
@@ -55,10 +56,12 @@ object UploadMain extends App {
     }
 
   val program = for {
-    implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.backend
     env <- ZIO.environment[Blocking]
     httpRequest <- HttpDownloader.request
-    (code, bytes) <- (httpRequest.send(): Task[Response[Stream[Throwable, Byte]]]).bimap(throwable("httpRequest.send"), r => r.code -> r.body)
+    (code, bytes) <- for {
+      implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.asyncBackend
+      res <- (httpRequest.send(): Task[Response[Stream[Throwable, Byte]]]).bimap(throwable("httpRequest.send"), r => r.code -> r.body)
+    } yield res
     _ <- IO.fail(downloadMoreLines(code))
       .when(!code.isSuccess)
     destLineStream = bytes
@@ -100,10 +103,13 @@ object UploadMain extends App {
       .toManaged { case (p, _) => Files.delete(p).ignore }
       .use { case (tempFile, uploadLines) =>
         for {
+          implicit0(sttpBackend: SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]) <- Sttp.noContentTypeCharsetBackend
           uploadRequest <- HttpUploader.request(uploadLines)
           (code, body) <- uploadRequest
             .streamBody(Stream.fromFile(Path.of(tempFile.toString)).provide(env))
-            .send().bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
+            .contentType(MediaType.TextCsv.noCharset)
+            .send()
+            .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
           _ <- IO.fail(failedUpload(code, body.toString))
             .when(!code.isSuccess)
         } yield ()

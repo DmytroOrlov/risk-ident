@@ -4,22 +4,27 @@ import capture.Capture
 import capture.Capture.Constructors
 import sttp.client._
 import sttp.client.asynchttpclient.zio._
+import sttp.client.httpclient.zio.{BlockingTask, HttpClientZioBackend}
+import zio.blocking.Blocking
 import zio.macros.accessible
-import zio.stream.Stream
+import zio.stream.{Stream, ZStream}
 import zio.{IO, Task, UIO}
 
 @accessible
 trait Sttp {
-  def backend: UIO[SttpBackend[Task, Stream[Throwable, Byte], NothingT]]
+  def asyncBackend: UIO[SttpBackend[Task, Stream[Throwable, Byte], NothingT]]
+
+  def noContentTypeCharsetBackend: UIO[SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]]
 }
 
 object Sttp {
-  val make =
-    AsyncHttpClientZioBackend.managed().map { impl =>
-      new Sttp {
-        val backend = IO.succeed(impl)
-      }
-    }
+  val make = for {
+    async <- AsyncHttpClientZioBackend.managed()
+    blocking <- HttpClientZioBackend.managed()
+  } yield new Sttp {
+    val asyncBackend = IO.succeed(async)
+    val noContentTypeCharsetBackend = IO.succeed(blocking)
+  }
 }
 
 @accessible
@@ -48,7 +53,6 @@ object HttpUploader {
     new HttpUploader {
       def request(lines: Long) = IO.succeed {
         basicRequest
-          .contentType("text/csv")
           .put(uri"${cfg.uploadUrl}/$lines")
       }
     }

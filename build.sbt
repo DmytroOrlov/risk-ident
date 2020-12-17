@@ -38,6 +38,7 @@ val Deps = new {
 
   val sttpClientCirce = "com.softwaremill.sttp.client" %% "circe" % V.sttp
   val asyncHttpClientBackendZio = "com.softwaremill.sttp.client" %% "async-http-client-backend-zio" % V.sttp
+  val httpClientBackendZio = "com.softwaremill.sttp.client" %% "httpclient-backend-zio" % V.sttp
 
   val elastic4sClientSttp = "com.sksamuel.elastic4s" %% "elastic4s-client-sttp" % V.elastic4s
   val elastic4sEffectZio = "com.sksamuel.elastic4s" %% "elastic4s-effect-zio" % V.elastic4s
@@ -69,6 +70,7 @@ lazy val `risk-ident-upload` = (project in file("."))
 
       Deps.sttpClientCirce,
       Deps.asyncHttpClientBackendZio,
+      Deps.httpClientBackendZio,
 
       Deps.tapirJsonCirce,
       Deps.tapirHttp4sServer,
