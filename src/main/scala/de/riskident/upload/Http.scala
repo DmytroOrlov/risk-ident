@@ -2,14 +2,15 @@ package de.riskident.upload
 
 import capture.Capture
 import capture.Capture.Constructors
+import de.riskident.upload.HttpErr.throwable
 import sttp.client._
 import sttp.client.asynchttpclient.zio._
 import sttp.client.httpclient.zio.{BlockingTask, HttpClientZioBackend}
-import sttp.model.MediaType
+import sttp.model.{MediaType, StatusCode}
 import zio.blocking.Blocking
 import zio.macros.accessible
 import zio.stream.{Stream, ZStream}
-import zio.{IO, Task, UIO}
+import zio.{IO, Task, UIO, ZIO}
 
 @accessible
 trait Sttp {
@@ -25,6 +26,23 @@ object Sttp {
   } yield new Sttp {
     val asyncBackend = IO.succeed(async)
     val noContentTypeCharsetBackend = IO.succeed(blocking)
+  }
+}
+
+@accessible
+trait Downloader {
+  def download: IO[Capture[HttpErr], (StatusCode, Stream[Throwable, Byte])]
+}
+
+object Downloader {
+  val make = for {
+    implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.asyncBackend
+    cfg <- ZIO.service[AppCfg]
+    httpRequest <- HttpDownloader.request
+  } yield new Downloader {
+    val download =
+      (httpRequest.send(): Task[Response[Stream[Throwable, Byte]]])
+        .bimap(throwable(s"httpRequest.send ${cfg.downloadUrl}"), r => r.code -> r.body)
   }
 }
 

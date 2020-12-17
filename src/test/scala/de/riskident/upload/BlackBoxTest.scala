@@ -20,6 +20,13 @@ abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionV
   }
 }
 
+final class DummyBlackBoxTest extends BlackBoxTest {
+  override def config: TestConfig = super.config.copy(
+    moduleOverrides = new ModuleDef {
+    }
+  )
+}
+
 final class DockerBlackBoxTest extends BlackBoxTest {
   override def config: TestConfig = super.config.copy(
     moduleOverrides = new ModuleDef {

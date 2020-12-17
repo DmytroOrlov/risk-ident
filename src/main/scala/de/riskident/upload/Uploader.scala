@@ -6,7 +6,7 @@ import cats.syntax.show._
 import de.riskident.upload.HttpErr.throwable
 import de.riskident.upload.UploadErr.{downloadMoreLines, failedUpload}
 import sttp.client.httpclient.zio.BlockingTask
-import sttp.client.{NothingT, Response, SttpBackend}
+import sttp.client.{NothingT, SttpBackend}
 import sttp.model.StatusCode
 import zio._
 import zio.blocking.Blocking
@@ -69,19 +69,15 @@ object Uploader {
     }
 
   val make = for {
-    env <- ZIO.environment[Has[HttpUploader] with Blocking]
+    env <- ZIO.environment[Has[HttpUploader] with Has[Downloader] with Blocking]
     cfg <- ZIO.service[AppCfg]
     httpRequest <- HttpDownloader.request
     asyncBackend <- Sttp.asyncBackend
     noContentTypeCharsetBackend <- Sttp.noContentTypeCharsetBackend
   } yield new Uploader {
     def upload =
-      for {
-        (code, bytes) <- for {
-          _ <- IO.unit
-          implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) = asyncBackend
-          res <- (httpRequest.send(): Task[Response[Stream[Throwable, Byte]]]).bimap(throwable(s"httpRequest.send ${cfg.downloadUrl}"), r => r.code -> r.body)
-        } yield res
+      (for {
+        (code, bytes) <- Downloader.download
         _ <- IO.fail(downloadMoreLines(code))
           .when(!code.isSuccess)
         destLineStream = bytes
@@ -136,8 +132,8 @@ object Uploader {
             .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
           _ <- IO.fail(failedUpload(code, body.toString))
             .when(!code.isSuccess)
-        } yield ()) provide env
-      } yield ()
+        } yield ())
+      } yield ()) provide env
   }
 }
 
