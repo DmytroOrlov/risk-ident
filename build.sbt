@@ -105,4 +105,5 @@ lazy val `provided-test-service` = project
   .disablePlugins(RevolverPlugin)
   .settings(
     mainClass in Compile := Some("de.riskident.Main"),
+    dockerExposedPorts := Seq(8080),
   )

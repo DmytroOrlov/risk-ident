@@ -1,6 +1,10 @@
+## Run unit and integration tests (require Docker)
+```sh
+$ sbt test
+```
 ## Package provided test service for integration tests
 ```sh
-$ sbt provided-test-service/docker:publishLocal
+$ sbt provided-test-service/docker:publish
 ```
 ## Run provided test service
 ```sh
