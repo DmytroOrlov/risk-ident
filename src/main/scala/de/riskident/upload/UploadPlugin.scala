@@ -20,7 +20,7 @@ object UploadPlugin extends PluginDef with ConfigModuleDef with ZIODIEffectModul
   make[Downloader].fromHas(Downloader.make)
   make[HttpDownloader].from(HttpDownloader.make _)
   make[HttpUploader].from(HttpUploader.make _)
-  make[Uploader].fromHas(Uploader.make)
+  make[UploaderLogic].fromHas(UploaderLogic.make)
   make[Task[Unit]].from(
     provideHas(
       program

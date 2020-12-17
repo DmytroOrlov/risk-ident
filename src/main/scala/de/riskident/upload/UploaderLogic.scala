@@ -14,11 +14,11 @@ import zio.macros.accessible
 import zio.stream.{Stream, ZStream, ZTransducer}
 
 @accessible
-trait Uploader {
-  def upload: IO[Capture[UploadErr with HttpErr], Unit]
+trait UploaderLogic {
+  def downloadUpload: IO[Capture[UploadErr with HttpErr], Unit]
 }
 
-object Uploader {
+object UploaderLogic {
   val destLineTransducer: ZTransducer[Any, Nothing, SourceLine, DestLine] =
     ZTransducer[Any, Nothing, SourceLine, DestLine] {
       def destLines(leftovers: Chunk[SourceLine]) =
@@ -71,11 +71,9 @@ object Uploader {
   val make = for {
     env <- ZIO.environment[Has[HttpUploader] with Has[Downloader] with Blocking]
     cfg <- ZIO.service[AppCfg]
-    httpRequest <- HttpDownloader.request
-    asyncBackend <- Sttp.asyncBackend
     noContentTypeCharsetBackend <- Sttp.noContentTypeCharsetBackend
-  } yield new Uploader {
-    def upload =
+  } yield new UploaderLogic {
+    def downloadUpload =
       (for {
         (code, bytes) <- Downloader.download
         _ <- IO.fail(downloadMoreLines(code))
@@ -97,8 +95,8 @@ object Uploader {
             }
           }
           .aggregate(destLineTransducer)
-        stringStream = Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
-          destLineStream.map(d => s"\n${d.show}")
+        byteStream = (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
+          destLineStream.map(d => s"\n${d.show}")).mapConcat(_.getBytes)
         _ <- (for {
           /*
           tempFile <- Files.createTempFile(prefix = None, fileAttributes = Iterable.empty)
@@ -127,7 +125,7 @@ object Uploader {
           uploadRequest <- HttpUploader.request(cfg.downloadLines)
           (code, body) <- uploadRequest
             // .streamBody(Stream.fromFile(Path.of(tempFile.toString)).provide(env))
-            .streamBody(stringStream.mapConcat(_.getBytes))
+            .streamBody(byteStream)
             .send()
             .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
           _ <- IO.fail(failedUpload(code, body.toString))

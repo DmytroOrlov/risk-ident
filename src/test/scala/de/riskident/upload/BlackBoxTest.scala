@@ -7,13 +7,16 @@ import izumi.distage.testkit.scalatest.DistageBIOEnvSpecScalatest
 import org.scalactic.TypeCheckedTripleEquals
 import org.scalatest.{EitherValues, OptionValues}
 import sttp.client._
+import sttp.model.StatusCode
 import zio._
+import zio.blocking.Blocking
+import zio.stream.Stream
 
 abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionValues with EitherValues with TypeCheckedTripleEquals {
-  "Uploader" should {
-    "successfully upload all entries" in {
+  "UploaderLogic" should {
+    "successfully download and upload all entries" in {
       (for {
-        _ <- Uploader.upload
+        _ <- UploaderLogic.downloadUpload
       } yield ())
         .mapError(_ continue new UploadErr.AsString with HttpErr.AsString {})
     }
@@ -23,6 +26,12 @@ abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionV
 final class DummyBlackBoxTest extends BlackBoxTest {
   override def config: TestConfig = super.config.copy(
     moduleOverrides = new ModuleDef {
+      make[Downloader].fromHas(for {
+        env <- ZIO.environment[Blocking]
+        res = Stream.fromResource("200.csv") provide env
+      } yield new Downloader {
+        def download = IO.succeed(StatusCode.Ok -> res)
+      })
     }
   )
 }

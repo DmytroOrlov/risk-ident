@@ -9,7 +9,7 @@ import java.net.URI
 import scala.concurrent.duration.Duration
 
 object UploadMain extends App {
-  val program = Uploader.upload
+  val program = UploaderLogic.downloadUpload
 
   def run(args: List[String]) = {
     val pluginConfig = PluginConfig.cached(
