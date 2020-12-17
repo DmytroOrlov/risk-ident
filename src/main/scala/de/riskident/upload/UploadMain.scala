@@ -10,7 +10,7 @@ import izumi.distage.plugins.PluginConfig
 import izumi.distage.plugins.load.PluginLoader
 import sttp.client.httpclient.zio.BlockingTask
 import sttp.client.{NothingT, Response, SttpBackend}
-import sttp.model.{MediaType, StatusCode}
+import sttp.model.StatusCode
 import zio._
 import zio.blocking.Blocking
 import zio.nio.channels.AsynchronousFileChannel
@@ -27,13 +27,29 @@ object UploadMain extends App {
       def destLines(leftovers: Chunk[SourceLine]) =
         if (leftovers.isEmpty) Chunk.empty
         else
-          Chunk.fromIterable(leftovers.groupBy(_.produktId).values.flatMap { articles =>
-            val sum = articles.map(_.stock).sum
-            if (sum == 0) Iterable.empty
-            else Iterable({
-              val res = articles.filterNot(_.stock == 0).minBy(_.price)
-              DestLine(res.produktId, res.name, res.description, res.price, sum)
-            })
+          Chunk.fromIterable({
+            /*
+              leftovers.groupBy(_.produktId).values.flatMap { articles =>
+                val sum = articles.map(_.stock).sum
+                if (sum == 0) Iterable.empty
+                else Iterable({
+                  val s = articles.filterNot(_.stock == 0).minBy(_.price)
+                  DestLine(s.produktId, s.name, s.description, s.price, sum)
+                })
+              }
+            */
+            leftovers.foldLeft(List.empty[DestLine]) {
+              case (Nil, s) if s.stock != 0 =>
+                DestLine(s.produktId, s.name, s.description, s.price, s.stock) :: Nil
+              case (a :: acc, s) if a.produktId == s.produktId && s.price < a.price =>
+                DestLine(s.produktId, s.name, s.description, s.price, s.stock + a.stockSum) :: acc
+              case (a :: acc, s) if a.produktId == s.produktId =>
+                a.copy(stockSum = a.stockSum + s.stock) :: acc
+              case (a :: acc, s) if s.stock != 0 =>
+                DestLine(s.produktId, s.name, s.description, s.price, s.stock) ::
+                  a :: acc
+              case (acc, _) => acc
+            }.reverse
           })
 
       ZRef.makeManaged[Chunk[SourceLine]](Chunk.empty).map(stateRef => {
@@ -57,6 +73,7 @@ object UploadMain extends App {
 
   val program = for {
     env <- ZIO.environment[Blocking]
+    cfg <- ZIO.service[AppCfg]
     httpRequest <- HttpDownloader.request
     (code, bytes) <- for {
       implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.asyncBackend
@@ -81,7 +98,10 @@ object UploadMain extends App {
         }
       }
       .aggregate(destLineTransducer)
+    stringStream = Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
+      destLineStream.map(d => s"\n${d.show}")
     _ <- (for {
+      /*
       tempFile <- Files.createTempFile(prefix = None, fileAttributes = Iterable.empty)
         .mapError(throwable("createTempFile"))
       uploadLines <- AsynchronousFileChannel.open(
@@ -91,8 +111,7 @@ object UploadMain extends App {
       ).mapError(throwable(s"write $tempFile")).use { channel =>
         var filePosition = 0
         var lines = -1
-        (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
-          destLineStream.map(d => s"\n${d.show}"))
+        stringStream
           .foreach { s =>
             lines = lines + 1
             channel.writeChunk(Chunk.fromArray(s.getBytes), filePosition)
@@ -103,17 +122,17 @@ object UploadMain extends App {
       .toManaged { case (p, _) => Files.delete(p).ignore }
       .use { case (tempFile, uploadLines) =>
         for {
-          implicit0(sttpBackend: SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]) <- Sttp.noContentTypeCharsetBackend
-          uploadRequest <- HttpUploader.request(uploadLines)
-          (code, body) <- uploadRequest
-            .streamBody(Stream.fromFile(Path.of(tempFile.toString)).provide(env))
-            .contentType(MediaType.TextCsv.noCharset)
-            .send()
-            .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
-          _ <- IO.fail(failedUpload(code, body.toString))
-            .when(!code.isSuccess)
-        } yield ()
-      }
+      */
+      implicit0(sttpBackend: SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]) <- Sttp.noContentTypeCharsetBackend
+      uploadRequest <- HttpUploader.request(cfg.downloadLines)
+      (code, body) <- uploadRequest
+        // .streamBody(Stream.fromFile(Path.of(tempFile.toString)).provide(env))
+        .streamBody(stringStream.mapConcat(_.getBytes))
+        .send()
+        .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
+      _ <- IO.fail(failedUpload(code, body.toString))
+        .when(!code.isSuccess)
+    } yield ())
   } yield ()
 
   def run(args: List[String]) = {

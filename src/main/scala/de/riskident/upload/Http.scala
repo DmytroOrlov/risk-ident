@@ -5,6 +5,7 @@ import capture.Capture.Constructors
 import sttp.client._
 import sttp.client.asynchttpclient.zio._
 import sttp.client.httpclient.zio.{BlockingTask, HttpClientZioBackend}
+import sttp.model.MediaType
 import zio.blocking.Blocking
 import zio.macros.accessible
 import zio.stream.{Stream, ZStream}
@@ -53,6 +54,7 @@ object HttpUploader {
     new HttpUploader {
       def request(lines: Long) = IO.succeed {
         basicRequest
+          .contentType(MediaType.TextCsv)
           .put(uri"${cfg.uploadUrl}/$lines")
       }
     }
