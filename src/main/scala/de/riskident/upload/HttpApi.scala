@@ -13,23 +13,6 @@ import zio.stream.{Stream, UStream, ZStream}
 import zio.{IO, Task, UIO, ZIO}
 
 @accessible
-trait Sttp {
-  def asyncBackend: UIO[SttpBackend[Task, Stream[Throwable, Byte], NothingT]]
-
-  def noContentTypeCharsetBackend: UIO[SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]]
-}
-
-object Sttp {
-  val make = for {
-    async <- AsyncHttpClientZioBackend.managed()
-    blocking <- HttpClientZioBackend.managed()
-  } yield new Sttp {
-    val asyncBackend = IO.succeed(async)
-    val noContentTypeCharsetBackend = IO.succeed(blocking)
-  }
-}
-
-@accessible
 trait DownloadApi {
   def download: IO[Capture[HttpErr], (StatusCode, Stream[Throwable, Byte])]
 }
@@ -58,13 +41,12 @@ object UploadApi {
     env <- ZIO.environment[Blocking]
     uploadReq <- HttpRequests.uploadReq
   } yield new UploadApi {
-    def upload(bytes: Stream[Throwable, Byte]) =
-      (for {
-        res <- uploadReq
-          .streamBody(bytes)
-          .send()
-          .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
-      } yield res) provide env
+    def upload(bytes: Stream[Throwable, Byte]) = {
+      uploadReq
+        .streamBody(bytes)
+        .send()
+        .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
+    } provide env
   }
 }
 
@@ -91,6 +73,23 @@ object HttpRequests {
           .readTimeout(cfg.requestTimeout)
       }
     }
+}
+
+@accessible
+trait Sttp {
+  def asyncBackend: UIO[SttpBackend[Task, Stream[Throwable, Byte], NothingT]]
+
+  def noContentTypeCharsetBackend: UIO[SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]]
+}
+
+object Sttp {
+  val make = for {
+    async <- AsyncHttpClientZioBackend.managed()
+    blocking <- HttpClientZioBackend.managed()
+  } yield new Sttp {
+    val asyncBackend = IO.succeed(async)
+    val noContentTypeCharsetBackend = IO.succeed(blocking)
+  }
 }
 
 trait HttpErr[+A] {

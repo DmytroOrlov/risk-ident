@@ -5,6 +5,7 @@ import distage._
 import izumi.distage.testkit.TestConfig
 import izumi.distage.testkit.scalatest.DistageBIOEnvSpecScalatest
 import org.scalactic.TypeCheckedTripleEquals
+import org.scalatest.matchers.must.Matchers
 import org.scalatest.{EitherValues, OptionValues}
 import sttp.client._
 import sttp.model.StatusCode
@@ -12,7 +13,7 @@ import zio._
 import zio.blocking.Blocking
 import zio.stream._
 
-abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionValues with EitherValues with TypeCheckedTripleEquals {
+abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with Matchers with OptionValues with EitherValues with TypeCheckedTripleEquals {
   "AppLogic" should {
     "successfully download and upload all entries" in {
       (for {
@@ -24,8 +25,6 @@ abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionV
 }
 
 final class DummyBlackBoxTest extends BlackBoxTest {
-  def streamReduce(a: String, b: String): String = a + b
-
   override def config: TestConfig = super.config.copy(
     moduleOverrides = new ModuleDef {
       make[DownloadApi].fromHas(for {
@@ -34,16 +33,17 @@ final class DummyBlackBoxTest extends BlackBoxTest {
       } yield new DownloadApi {
         def download = IO.succeed(StatusCode.Ok -> res)
       })
+
       make[UploadApi].fromHas(for {
         env <- ZIO.environment[Blocking]
         path = "200-resp.csv"
-        orig <- Stream.fromResource(path).aggregate(ZTransducer.utf8Decode).run(Sink.foldLeft("")(streamReduce)) provide env
+        reference <- Stream.fromResource(path).aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines).run(Sink.collectAll) provide env
       } yield new UploadApi {
         def upload(bytes: Stream[Throwable, Byte]) =
           (for {
-            res <- bytes.aggregate(ZTransducer.utf8Decode).run(Sink.foldLeft("")(streamReduce))
+            res <- bytes.aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines).run(Sink.collectAll)
             _ <- IO {
-              assert(res === orig)
+              res.toList must contain theSameElementsAs reference.toList
             }
           } yield StatusCode.Ok -> Right("ok"))
             .mapError(HttpErr.throwable(s"compare with $path"))
