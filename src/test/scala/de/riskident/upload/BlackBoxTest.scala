@@ -79,7 +79,7 @@ final class DockerBlackBoxTest extends BlackBoxTest {
 }
 
 final class NegativeTest extends DistageBIOEnvSpecScalatest[ZIO] with Matchers with OptionValues with EitherValues with TypeCheckedTripleEquals {
-  "AppLogic" should {
+  "AppLogic.processAndUpload" should {
     "fail if download status is not successful" in {
       for {
         res <- AppLogic.processAndUpload(StatusCode.BadRequest, Stream.empty)
@@ -98,5 +98,35 @@ final class NegativeTest extends DistageBIOEnvSpecScalatest[ZIO] with Matchers w
         }
       } yield ()
     }
+    "fail if upload status is not successful" in {
+      for {
+        res <- AppLogic.processAndUpload(StatusCode.Ok, Stream.fromIterable("\n".getBytes))
+          .mapError(_ continue new HttpErr[String] with AppErr[String] {
+            override def failedUpload(code: StatusCode, body: String): String = s"failedUpload $code $body"
+
+            override def throwable(message: String)(e: Throwable): String = ???
+
+            override def downloadMoreLines(code: StatusCode): String = ???
+
+            override def message(message: String): String = ???
+          })
+          .either
+        _ <- IO {
+          assert(res.left.value === "failedUpload 500 ok")
+        }
+      } yield ()
+    }
   }
+
+  override def config: TestConfig = super.config.copy(
+    moduleOverrides = new ModuleDef {
+      make[UploadApi].from(new UploadApi {
+        def upload(bytes: Stream[Throwable, Byte]) =
+          for {
+            _ <- zio.IO.unit
+            res = StatusCode.InternalServerError -> Right("ok")
+          } yield res
+      })
+    }
+  )
 }
