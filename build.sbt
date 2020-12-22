@@ -22,6 +22,7 @@ val V = new {
 val Deps = new {
   val zioInteropCats = "dev.zio" %% "zio-interop-cats" % V.zioInteropCats
   val zio = "dev.zio" %% "zio" % V.zio
+  val zioStreams = "dev.zio" %% "zio-streams" % V.zio
   val distageFramework = "io.7mind.izumi" %% "distage-framework" % V.distage
   val distageFrameworkDocker = "io.7mind.izumi" %% "distage-framework-docker" % V.distage
   val distageTestkitScalatest = "io.7mind.izumi" %% "distage-testkit-scalatest" % V.distage
@@ -53,6 +54,7 @@ lazy val `risk-ident-upload` = (project in file("."))
   .settings(
     libraryDependencies ++= Seq(
       Deps.zio,
+      Deps.zioStreams,
       Deps.zioInteropCats,
       Deps.logstageAdapterSlf4J,
       Deps.distageFramework,
