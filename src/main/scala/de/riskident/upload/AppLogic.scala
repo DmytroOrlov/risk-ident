@@ -5,6 +5,7 @@ import capture.Capture.Constructors
 import cats.syntax.show._
 import de.riskident.upload.HttpErr.throwable
 import de.riskident.upload.UploadErr.{downloadMoreLines, failedUpload}
+import de.riskident.upload.models.{DestLine, SourceLine}
 import sttp.client.httpclient.zio.BlockingTask
 import sttp.client.{NothingT, SttpBackend}
 import sttp.model.StatusCode
@@ -14,11 +15,11 @@ import zio.macros.accessible
 import zio.stream.{Stream, ZStream, ZTransducer}
 
 @accessible
-trait UploaderLogic {
+trait AppLogic {
   def downloadUpload: IO[Capture[UploadErr with HttpErr], Unit]
 }
 
-object UploaderLogic {
+object AppLogic {
   val destLineTransducer: ZTransducer[Any, Nothing, SourceLine, DestLine] =
     ZTransducer[Any, Nothing, SourceLine, DestLine] {
       def destLines(leftovers: Chunk[SourceLine]) =
@@ -60,7 +61,7 @@ object UploaderLogic {
 
   val make = for {
     env <- ZIO.environment[Has[Uploader] with Has[Downloader] with Blocking]
-  } yield new UploaderLogic {
+  } yield new AppLogic {
     def downloadUpload =
       (for {
         (code, bytes) <- Downloader.download

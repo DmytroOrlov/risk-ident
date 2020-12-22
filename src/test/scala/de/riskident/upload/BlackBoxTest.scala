@@ -13,10 +13,10 @@ import zio.blocking.Blocking
 import zio.stream._
 
 abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionValues with EitherValues with TypeCheckedTripleEquals {
-  "UploaderLogic" should {
+  "AppLogic" should {
     "successfully download and upload all entries" in {
       (for {
-        _ <- UploaderLogic.downloadUpload
+        _ <- AppLogic.downloadUpload
       } yield ())
         .mapError(_ continue new UploadErr.AsString with HttpErr.AsString {})
     }

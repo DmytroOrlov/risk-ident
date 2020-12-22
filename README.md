@@ -2,9 +2,9 @@
 ```sh
 $ sbt test
 [info] DummyBlackBoxTest:
-[info] - UploaderLogic should successfully download and upload all entries
+[info] - AppLogic should successfully download and upload all entries
 [info] DockerBlackBoxTest:
-[info] - UploaderLogic should successfully download and upload all entries
+[info] - AppLogic should successfully download and upload all entries
 [info] Tests: succeeded 2, failed 0, canceled 0, ignored 0, pending 0
 [info] All tests passed.
 ```

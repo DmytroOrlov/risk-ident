@@ -8,8 +8,8 @@ import zio._
 import java.net.URI
 import scala.concurrent.duration.Duration
 
-object UploadMain extends App {
-  val program = UploaderLogic.downloadUpload
+object AppMain extends App {
+  val program = AppLogic.downloadUpload
 
   def run(args: List[String]) = {
     val pluginConfig = PluginConfig.cached(
