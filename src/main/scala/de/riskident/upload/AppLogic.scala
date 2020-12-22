@@ -16,7 +16,7 @@ import zio.stream.{Stream, ZStream, ZTransducer}
 
 @accessible
 trait AppLogic {
-  def downloadUpload: IO[Capture[AppErr with HttpErr], Unit]
+  def downloadUpload: IO[Capture[AppErr with HttpErr], String]
 }
 
 object AppLogic {
@@ -64,10 +64,10 @@ object AppLogic {
   } yield new AppLogic {
     def downloadUpload =
       (for {
-        (code, bytes) <- DownloadApi.download
+        (code, downloadBytes) <- DownloadApi.download
         _ <- IO.fail(downloadMoreLines(code))
           .when(!code.isSuccess)
-        destLineStream = bytes
+        destLineStream = downloadBytes
           .aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines)
           .drop(1)
           .map {
@@ -86,10 +86,10 @@ object AppLogic {
           .aggregate(destLineTransducer)
         byteStream = (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
           destLineStream.map(d => s"\n${d.show}")).mapConcat(_.getBytes)
-        (code, body) <- UploadApi.upload(byteStream)
-        _ <- IO.fail(failedUpload(code, body.toString))
+        (code, uploadResp) <- UploadApi.upload(byteStream)
+        _ <- IO.fail(failedUpload(code, uploadResp.merge))
           .when(!code.isSuccess)
-      } yield ()) provide env
+      } yield uploadResp.merge) provide env
   }
 }
 

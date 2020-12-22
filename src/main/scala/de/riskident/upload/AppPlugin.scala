@@ -26,6 +26,7 @@ object AppPlugin extends PluginDef with ConfigModuleDef with ZIODIEffectModule {
   make[Task[Unit]].from(provideHas(
     program
       .mapError(_ continue new HttpErr.AsThrowable with AppErr.AsThrowable {})
+      .unit
       .provide
   ))
 }
