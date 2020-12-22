@@ -57,7 +57,7 @@ object HttpDownloader {
       basicRequest
         .get(uri"${cfg.downloadUrl}/${cfg.downloadLines}")
         .response(ResponseAsStream[Stream[Throwable, Byte], Stream[Throwable, Byte]]())
-        .readTimeout(cfg.requestTimeout)
+        .readTimeout(cfg.downloadTimeout)
     }
   }
 }

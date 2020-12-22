@@ -64,7 +64,7 @@ final class DockerBlackBoxTest extends BlackBoxTest {
           }
         } yield {
           import scala.concurrent.duration._
-          AppCfg(200, downloadUrl.toJavaUri, uploadUrl.toJavaUri, 10.seconds)
+          AppCfg(200, 10.seconds, downloadUrl.toJavaUri, uploadUrl.toJavaUri)
         }
       }
     },

@@ -19,16 +19,17 @@ object AppMain extends App {
     )
     val appModules = PluginLoader().load(pluginConfig)
 
-    Injector()
+    val app = Injector()
       .produceGetF[Task, Task[Unit]](appModules.merge)
       .useEffect
-      .exitCode
+
+    app.exitCode
   }
 }
 
 case class AppCfg(
     downloadLines: Int,
+    downloadTimeout: Duration,
     downloadUrl: URI,
     uploadUrl: URI,
-    requestTimeout: Duration,
 )
