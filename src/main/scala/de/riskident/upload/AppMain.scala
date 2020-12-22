@@ -1,5 +1,6 @@
 package de.riskident.upload
 
+import de.riskident.upload.AppPlugin.Program
 import distage._
 import izumi.distage.plugins.PluginConfig
 import izumi.distage.plugins.load.PluginLoader
@@ -9,7 +10,10 @@ import java.net.URI
 import scala.concurrent.duration.Duration
 
 object AppMain extends App {
-  val program = AppLogic.downloadUpload
+  val program = for {
+    (code, downloadBytes) <- DownloadApi.download
+    res <- AppLogic.processAndUpload(code, downloadBytes)
+  } yield res
 
   def run(args: List[String]) = {
     val pluginConfig = PluginConfig.cached(
@@ -20,7 +24,7 @@ object AppMain extends App {
     val appModules = PluginLoader().load(pluginConfig)
 
     val app = Injector()
-      .produceGetF[Task, Task[Unit]](appModules.merge)
+      .produceGetF[Task, Program](appModules.merge)
       .useEffect
 
     app.exitCode

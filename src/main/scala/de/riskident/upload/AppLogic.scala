@@ -16,7 +16,7 @@ import zio.stream.{Stream, ZStream, ZTransducer}
 
 @accessible
 trait AppLogic {
-  def downloadUpload: IO[Capture[AppErr with HttpErr], Either[String, Chunk[String]]]
+  def processAndUpload(code: StatusCode, downloadBytes: Stream[Throwable, Byte]): IO[Capture[AppErr with HttpErr], Either[String, Chunk[String]]]
 }
 
 object AppLogic {
@@ -62,9 +62,8 @@ object AppLogic {
   val make = for {
     env <- ZIO.environment[Has[UploadApi] with Has[DownloadApi] with Blocking]
   } yield new AppLogic {
-    def downloadUpload =
+    def processAndUpload(code: StatusCode, downloadBytes: Stream[Throwable, Byte]) =
       (for {
-        (code, downloadBytes) <- DownloadApi.download
         _ <- IO.fail(downloadMoreLines(code))
           .when(!code.isSuccess)
         destLineStream = downloadBytes

@@ -1,5 +1,6 @@
 package de.riskident.upload
 
+import de.riskident.upload.AppPlugin.Program
 import de.riskident.upload.fixtures.{TestDocker, TestDockerSvc}
 import distage._
 import izumi.distage.testkit.TestConfig
@@ -15,12 +16,13 @@ import zio.stream._
 
 abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with Matchers with OptionValues with EitherValues with TypeCheckedTripleEquals {
   "AppLogic" should {
-    "successfully download and upload all entries" in {
-      (for {
-        res <- AppLogic.downloadUpload
-        _ = assert(res.right.value.toList === List("Finished reading data, result is correct"))
-      } yield ())
-        .mapError(_ continue new AppErr.AsString with HttpErr.AsString {})
+    "successfully download and upload all entries" in { program: Program =>
+      for {
+        res <- program
+        _ <- IO {
+          assert(res.right.value.toList === List("Finished reading data, result is correct"))
+        }
+      } yield ()
     }
   }
 }

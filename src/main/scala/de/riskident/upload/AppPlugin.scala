@@ -10,6 +10,8 @@ import izumi.distage.plugins.PluginDef
 import zio._
 
 object AppPlugin extends PluginDef with ConfigModuleDef with ZIODIEffectModule {
+  type Program = Task[Either[String, Chunk[String]]]
+
   def provideHas[R: HasConstructor, A: Tag](fn: R => A): ProviderMagnet[A] =
     HasConstructor[R].map(fn)
 
@@ -23,10 +25,9 @@ object AppPlugin extends PluginDef with ConfigModuleDef with ZIODIEffectModule {
   make[AppLogic].fromHas(AppLogic.make)
 
   makeConfig[AppCfg]("app")
-  make[Task[Unit]].from(provideHas(
+  make[Program].from(provideHas(
     program
       .mapError(_ continue new HttpErr.AsThrowable with AppErr.AsThrowable {})
-      .unit
       .provide
   ))
 }
