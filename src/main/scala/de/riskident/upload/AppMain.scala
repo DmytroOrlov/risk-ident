@@ -29,7 +29,7 @@ object AppMain extends App {
 
 case class AppCfg(
     downloadLines: Int,
-    downloadTimeout: Duration,
     downloadUrl: URI,
     uploadUrl: URI,
+    requestTimeout: Duration,
 )

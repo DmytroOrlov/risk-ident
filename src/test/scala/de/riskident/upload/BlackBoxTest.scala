@@ -36,7 +36,8 @@ final class DummyBlackBoxTest extends BlackBoxTest {
       })
       make[Uploader].fromHas(for {
         env <- ZIO.environment[Blocking]
-        orig <- Stream.fromResource("200-resp.csv").aggregate(ZTransducer.utf8Decode).run(Sink.foldLeft("")(streamReduce)) provide env
+        path = "200-resp.csv"
+        orig <- Stream.fromResource(path).aggregate(ZTransducer.utf8Decode).run(Sink.foldLeft("")(streamReduce)) provide env
       } yield new Uploader {
         def upload(bytes: Stream[Throwable, Byte]) =
           (for {
@@ -45,7 +46,7 @@ final class DummyBlackBoxTest extends BlackBoxTest {
               assert(res === orig)
             }
           } yield StatusCode.Ok -> Right("ok"))
-            .mapError(HttpErr.throwable("res to orig"))
+            .mapError(HttpErr.throwable(s"compare with $path"))
       })
     }
   )
@@ -64,7 +65,7 @@ final class DockerBlackBoxTest extends BlackBoxTest {
           }
         } yield {
           import scala.concurrent.duration._
-          AppCfg(200, 10.seconds, downloadUrl.toJavaUri, uploadUrl.toJavaUri)
+          AppCfg(200, downloadUrl.toJavaUri, uploadUrl.toJavaUri, 10.seconds)
         }
       }
     },

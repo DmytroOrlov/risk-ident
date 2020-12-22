@@ -16,9 +16,7 @@ object AppPlugin extends PluginDef with ConfigModuleDef with ZIODIEffectModule {
   include(AppConfigModule(ConfigFactory.defaultApplication()))
 
   make[Sttp].fromHas(Sttp.make)
-
-  make[HttpDownloader].from(HttpDownloader.make _)
-  make[HttpUploader].from(HttpUploader.make _)
+  make[HttpRequests].from(HttpRequests.make _)
 
   make[Downloader].fromHas(Downloader.make)
   make[Uploader].fromHas(Uploader.make)

@@ -38,27 +38,12 @@ object Downloader {
   val make = for {
     implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.asyncBackend
     cfg <- ZIO.service[AppCfg]
-    httpRequest <- HttpDownloader.request
+    downloadRequest <- HttpRequests.downloadRequest
   } yield new Downloader {
     val download =
-      (httpRequest.send(): Task[Response[Stream[Throwable, Byte]]])
+      downloadRequest
+        .send()
         .bimap(throwable(s"httpRequest.send ${cfg.downloadUrl}"), r => r.code -> r.body)
-  }
-}
-
-@accessible
-trait HttpDownloader {
-  def request: UIO[RequestT[Identity, Stream[Throwable, Byte], Stream[Throwable, Byte]]]
-}
-
-object HttpDownloader {
-  def make(cfg: AppCfg) = new HttpDownloader {
-    val request = IO.succeed {
-      basicRequest
-        .get(uri"${cfg.downloadUrl}/${cfg.downloadLines}")
-        .response(ResponseAsStream[Stream[Throwable, Byte], Stream[Throwable, Byte]]())
-        .readTimeout(cfg.downloadTimeout)
-    }
   }
 }
 
@@ -71,8 +56,7 @@ object Uploader {
   val make = for {
     implicit0(sttpBackend: SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]) <- Sttp.noContentTypeCharsetBackend
     env <- ZIO.environment[Blocking]
-    cfg <- ZIO.service[AppCfg]
-    uploadRequest <- HttpUploader.request(cfg.downloadLines)
+    uploadRequest <- HttpRequests.uploadRequest
   } yield new Uploader {
     def upload(bytes: Stream[Throwable, Byte]) =
       (for {
@@ -85,17 +69,26 @@ object Uploader {
 }
 
 @accessible
-trait HttpUploader {
-  def request(lines: Long): UIO[RequestT[Identity, Either[String, String], Nothing]]
+trait HttpRequests {
+  def downloadRequest: UIO[RequestT[Identity, Stream[Throwable, Byte], Stream[Throwable, Byte]]]
+
+  def uploadRequest: UIO[RequestT[Identity, Either[String, String], Nothing]]
 }
 
-object HttpUploader {
+object HttpRequests {
   def make(cfg: AppCfg) =
-    new HttpUploader {
-      def request(lines: Long) = IO.succeed {
+    new HttpRequests {
+      val downloadRequest = IO.succeed {
         basicRequest
+          .get(uri"${cfg.downloadUrl}/${cfg.downloadLines}")
+          .response(ResponseAsStream[Stream[Throwable, Byte], Stream[Throwable, Byte]]())
+          .readTimeout(cfg.requestTimeout)
+      }
+      val uploadRequest = IO.succeed {
+        basicRequest
+          .put(uri"${cfg.uploadUrl}/${cfg.downloadLines}")
           .contentType(MediaType.TextCsv)
-          .put(uri"${cfg.uploadUrl}/$lines")
+          .readTimeout(cfg.requestTimeout)
       }
     }
 }
@@ -108,15 +101,15 @@ object HttpErr extends Constructors[HttpErr] {
   def throwable(message: String)(e: Throwable) =
     Capture[HttpErr](_.throwable(message)(e))
 
-  val asThrowable = new AsThrowable {}
-
   trait AsThrowable extends HttpErr[Throwable] {
-    def throwable(message: String)(e: Throwable) = new RuntimeException(s"$message: ${e.getMessage}")
+    def throwable(message: String)(e: Throwable) =
+      new RuntimeException(s"$message: ${e.getMessage}")
   }
 
 
   trait AsString extends HttpErr[String] {
-    def throwable(message: String)(e: Throwable) = s"$message: ${e.getMessage}"
+    def throwable(message: String)(e: Throwable) =
+      s"$message: ${e.getMessage}"
   }
 
 }
