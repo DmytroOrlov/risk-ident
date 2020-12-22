@@ -17,7 +17,8 @@ abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with Matcher
   "AppLogic" should {
     "successfully download and upload all entries" in {
       (for {
-        _ <- AppLogic.downloadUpload
+        res <- AppLogic.downloadUpload
+        _ = assert(res === Chunk.single("Finished reading data, result is correct"))
       } yield ())
         .mapError(_ continue new AppErr.AsString with HttpErr.AsString {})
     }
@@ -45,7 +46,7 @@ final class DummyBlackBoxTest extends BlackBoxTest {
             _ <- IO {
               res.toList must contain theSameElementsAs reference.toList
             }
-          } yield StatusCode.Ok -> Right("ok"))
+          } yield StatusCode.Ok -> Right("Finished reading data, result is correct"))
             .mapError(HttpErr.throwable(s"compare with $path"))
       })
     }
