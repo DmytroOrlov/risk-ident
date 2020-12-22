@@ -9,7 +9,7 @@ import sttp.client.httpclient.zio.{BlockingTask, HttpClientZioBackend}
 import sttp.model.{MediaType, StatusCode}
 import zio.blocking.Blocking
 import zio.macros.accessible
-import zio.stream.{Stream, UStream, ZStream}
+import zio.stream.{Stream, ZStream}
 import zio.{IO, Task, UIO, ZIO}
 
 @accessible
