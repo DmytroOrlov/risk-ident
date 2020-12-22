@@ -67,6 +67,7 @@ lazy val `risk-ident-upload` = (project in file("."))
     addCompilerPlugin(Deps.kindProjector),
   )
   .dependsOn(macros)
+  .aggregate(macros)
 
 lazy val macros = project
   .disablePlugins(RevolverPlugin)

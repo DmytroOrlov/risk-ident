@@ -53,7 +53,7 @@ final class NegativeTest extends DistageBIOEnvSpecScalatest[ZIO] with Matchers w
   override def config: TestConfig = super.config.copy(
     moduleOverrides = new ModuleDef {
       make[UploadApi].from(new UploadApi {
-        def upload(bytes: Stream[Throwable, Byte]) =
+        def upload(lines: Int, bytes: Stream[Throwable, Byte]) =
           for {
             _ <- zio.IO.unit
             res = StatusCode.InternalServerError -> Right("ok")

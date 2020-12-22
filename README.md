@@ -1,12 +1,20 @@
 ## Run unit and integration tests (require Docker)
 ```sh
 $ sbt test
-[info] DummyBlackBoxTest:
-[info] - AppLogic should successfully download and upload all entries
 [info] DockerBlackBoxTest:
-[info] - AppLogic should successfully download and upload all entries
-[info] Tests: succeeded 2, failed 0, canceled 0, ignored 0, pending 0
+[info] - Program should successfully download and upload all entries
+[info] DummyBlackBoxTest:
+[info] - Program should successfully download and upload all entries
+[info] NegativeTest:
+[info] - AppLogic.processAndUpload should fail if download status is not successful
+[info] - AppLogic.processAndUpload should fail if upload status is not successful
+[info] ScalaTest
+[info] Run completed in 19 seconds, 839 milliseconds.
+[info] Total number of tests run: 4
+[info] Suites: completed 3, aborted 0
+[info] Tests: succeeded 4, failed 0, canceled 0, ignored 0, pending 0
 [info] All tests passed.
+[info] Passed: Total 4, Failed 0, Errors 0, Passed 4
 ```
 ## Package provided test service for integration tests
 ```sh

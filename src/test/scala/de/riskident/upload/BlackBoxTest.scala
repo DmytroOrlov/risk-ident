@@ -42,7 +42,7 @@ final class DummyBlackBoxTest extends BlackBoxTest {
         path = "200-resp.csv"
         reference <- Stream.fromResource(path).aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines).run(Sink.collectAll) provide env
       } yield new UploadApi {
-        def upload(bytes: Stream[Throwable, Byte]) =
+        def upload(lines: Int, bytes: Stream[Throwable, Byte]) =
           (for {
             res <- bytes.aggregate(ZTransducer.utf8Decode >>> ZTransducer.splitLines).run(Sink.collectAll)
             _ <- IO {
@@ -64,7 +64,7 @@ final class DockerBlackBoxTest extends BlackBoxTest {
           uploadUrl <- Task(uri"http://${service.test.hostV4}:${service.test.port}/products")
           _ <- {
             import zio.duration._
-            ZIO.sleep(5.seconds)
+            ZIO.sleep(10.seconds)
           }
         } yield {
           import scala.concurrent.duration._

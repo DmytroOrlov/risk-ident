@@ -7,10 +7,10 @@ import sttp.client._
 import sttp.client.asynchttpclient.zio._
 import sttp.client.httpclient.zio.{BlockingTask, HttpClientZioBackend}
 import sttp.model.{MediaType, StatusCode}
+import zio._
 import zio.blocking.Blocking
 import zio.macros.accessible
 import zio.stream.{Stream, ZStream}
-import zio.{IO, Task, UIO, ZIO}
 
 @accessible
 trait DownloadApi {
@@ -32,21 +32,23 @@ object DownloadApi {
 
 @accessible
 trait UploadApi {
-  def upload(bytes: Stream[Throwable, Byte]): IO[Capture[HttpErr], (StatusCode, Either[String, String])]
+  def upload(lines: Int, bytes: Stream[Throwable, Byte]): IO[Capture[HttpErr], (StatusCode, Either[String, String])]
 }
 
 object UploadApi {
   val make = for {
     implicit0(blockingBackend: SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]) <- Sttp.noContentTypeCharsetBackend
-    env <- ZIO.environment[Blocking]
-    uploadReq <- HttpRequests.uploadReq
+    env <- ZIO.environment[Blocking with Has[HttpRequests]]
   } yield new UploadApi {
-    def upload(bytes: Stream[Throwable, Byte]) = {
-      uploadReq
-        .streamBody(bytes)
-        .send()
-        .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
-    } provide env
+    def upload(lines: Int, bytes: Stream[Throwable, Byte]) =
+      for {
+        uploadReq <- HttpRequests.uploadReq(lines) provide env
+        res <- uploadReq
+          .streamBody(bytes)
+          .send()
+          .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
+          .provide(env)
+      } yield res
   }
 }
 
@@ -54,21 +56,23 @@ object UploadApi {
 trait HttpRequests {
   def downloadReq: UIO[RequestT[Identity, Stream[Throwable, Byte], Stream[Throwable, Byte]]]
 
-  def uploadReq: UIO[RequestT[Identity, Either[String, String], Nothing]]
+  def uploadReq(lines: Int): UIO[RequestT[Identity, Either[String, String], Nothing]]
 }
 
 object HttpRequests {
   def make(cfg: AppCfg) =
     new HttpRequests {
       val downloadReq = IO.succeed {
+        val lines = cfg.downloadLines
         basicRequest
-          .get(uri"${cfg.downloadUrl}/${cfg.downloadLines}")
+          .get(uri"${cfg.downloadUrl}/$lines")
           .response(ResponseAsStream[Stream[Throwable, Byte], Stream[Throwable, Byte]]())
           .readTimeout(cfg.requestTimeout)
       }
-      val uploadReq = IO.succeed {
+
+      def uploadReq(lines: Int) = IO.succeed {
         basicRequest
-          .put(uri"${cfg.uploadUrl}/${cfg.downloadLines}")
+          .put(uri"${cfg.uploadUrl}/$lines")
           .contentType(MediaType.TextCsv)
           .readTimeout(cfg.requestTimeout)
       }

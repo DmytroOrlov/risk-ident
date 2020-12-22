@@ -61,6 +61,7 @@ object AppLogic {
 
   val make = for {
     env <- ZIO.environment[Has[UploadApi] with Has[DownloadApi] with Blocking]
+    cfg <- ZIO.service[AppCfg]
   } yield new AppLogic {
     def processAndUpload(code: StatusCode, downloadBytes: Stream[Throwable, Byte]) =
       (for {
@@ -85,7 +86,7 @@ object AppLogic {
           .aggregate(destLineTransducer)
         byteStream = (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
           destLineStream.map(d => s"\n${d.show}")).mapConcat(_.getBytes)
-        (code, uploadResp) <- UploadApi.upload(byteStream)
+        (code, uploadResp) <- UploadApi.upload(cfg.downloadLines, byteStream)
         _ <- IO.fail(failedUpload(code, uploadResp.merge))
           .when(!code.isSuccess)
       } yield uploadResp.map(Chunk.single)) provide env
