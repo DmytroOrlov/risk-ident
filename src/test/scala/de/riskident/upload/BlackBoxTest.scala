@@ -15,7 +15,7 @@ import zio.blocking.Blocking
 import zio.stream._
 
 abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with Matchers with OptionValues with EitherValues with TypeCheckedTripleEquals {
-  "AppLogic" should {
+  "Program" should {
     "successfully download and upload all entries" in { program: Program =>
       for {
         res <- program
@@ -76,4 +76,27 @@ final class DockerBlackBoxTest extends BlackBoxTest {
       DIKey.get[TestDocker.Container],
     ),
   )
+}
+
+final class NegativeTest extends DistageBIOEnvSpecScalatest[ZIO] with Matchers with OptionValues with EitherValues with TypeCheckedTripleEquals {
+  "AppLogic" should {
+    "fail if download status is not successful" in {
+      for {
+        res <- AppLogic.processAndUpload(StatusCode.BadRequest, Stream.empty)
+          .mapError(_ continue new AppErr[String] with HttpErr[String] {
+            override def downloadMoreLines(code: StatusCode): String = s"downloadMoreLines $code"
+
+            override def failedUpload(code: StatusCode, body: String): String = ???
+
+            override def message(message: String): String = ???
+
+            override def throwable(message: String)(e: Throwable): String = ???
+          })
+          .either
+        _ <- IO {
+          assert(res.left.value === "downloadMoreLines 400")
+        }
+      } yield ()
+    }
+  }
 }
