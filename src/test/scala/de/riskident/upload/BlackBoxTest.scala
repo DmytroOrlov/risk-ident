@@ -18,7 +18,7 @@ abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with OptionV
       (for {
         _ <- AppLogic.downloadUpload
       } yield ())
-        .mapError(_ continue new UploadErr.AsString with HttpErr.AsString {})
+        .mapError(_ continue new AppErr.AsString with HttpErr.AsString {})
     }
   }
 }
@@ -28,17 +28,17 @@ final class DummyBlackBoxTest extends BlackBoxTest {
 
   override def config: TestConfig = super.config.copy(
     moduleOverrides = new ModuleDef {
-      make[Downloader].fromHas(for {
+      make[DownloadApi].fromHas(for {
         env <- ZIO.environment[Blocking]
         res = Stream.fromResource("200.csv") provide env
-      } yield new Downloader {
+      } yield new DownloadApi {
         def download = IO.succeed(StatusCode.Ok -> res)
       })
-      make[Uploader].fromHas(for {
+      make[UploadApi].fromHas(for {
         env <- ZIO.environment[Blocking]
         path = "200-resp.csv"
         orig <- Stream.fromResource(path).aggregate(ZTransducer.utf8Decode).run(Sink.foldLeft("")(streamReduce)) provide env
-      } yield new Uploader {
+      } yield new UploadApi {
         def upload(bytes: Stream[Throwable, Byte]) =
           (for {
             res <- bytes.aggregate(ZTransducer.utf8Decode).run(Sink.foldLeft("")(streamReduce))

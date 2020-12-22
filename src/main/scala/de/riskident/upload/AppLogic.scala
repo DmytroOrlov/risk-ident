@@ -4,7 +4,7 @@ import capture.Capture
 import capture.Capture.Constructors
 import cats.syntax.show._
 import de.riskident.upload.HttpErr.throwable
-import de.riskident.upload.UploadErr.{downloadMoreLines, failedUpload}
+import de.riskident.upload.AppErr.{downloadMoreLines, failedUpload}
 import de.riskident.upload.models.{DestLine, SourceLine}
 import sttp.client.httpclient.zio.BlockingTask
 import sttp.client.{NothingT, SttpBackend}
@@ -16,7 +16,7 @@ import zio.stream.{Stream, ZStream, ZTransducer}
 
 @accessible
 trait AppLogic {
-  def downloadUpload: IO[Capture[UploadErr with HttpErr], Unit]
+  def downloadUpload: IO[Capture[AppErr with HttpErr], Unit]
 }
 
 object AppLogic {
@@ -60,11 +60,11 @@ object AppLogic {
     }
 
   val make = for {
-    env <- ZIO.environment[Has[Uploader] with Has[Downloader] with Blocking]
+    env <- ZIO.environment[Has[UploadApi] with Has[DownloadApi] with Blocking]
   } yield new AppLogic {
     def downloadUpload =
       (for {
-        (code, bytes) <- Downloader.download
+        (code, bytes) <- DownloadApi.download
         _ <- IO.fail(downloadMoreLines(code))
           .when(!code.isSuccess)
         destLineStream = bytes
@@ -86,14 +86,14 @@ object AppLogic {
           .aggregate(destLineTransducer)
         byteStream = (Stream.succeed("produktId|name|beschreibung|preis|summeBestand") ++
           destLineStream.map(d => s"\n${d.show}")).mapConcat(_.getBytes)
-        (code, body) <- Uploader.upload(byteStream)
+        (code, body) <- UploadApi.upload(byteStream)
         _ <- IO.fail(failedUpload(code, body.toString))
           .when(!code.isSuccess)
       } yield ()) provide env
   }
 }
 
-trait UploadErr[+A] {
+trait AppErr[+A] {
   def downloadMoreLines(code: StatusCode): A
 
   def failedUpload(code: StatusCode, body: String): A
@@ -101,17 +101,17 @@ trait UploadErr[+A] {
   def message(message: String): A
 }
 
-object UploadErr extends Constructors[UploadErr] {
+object AppErr extends Constructors[AppErr] {
   def message(message: String) =
-    Capture[UploadErr](_.message(message))
+    Capture[AppErr](_.message(message))
 
   def downloadMoreLines(code: StatusCode) =
-    Capture[UploadErr](_.downloadMoreLines(code))
+    Capture[AppErr](_.downloadMoreLines(code))
 
   def failedUpload(code: StatusCode, body: String) =
-    Capture[UploadErr](_.failedUpload(code, body))
+    Capture[AppErr](_.failedUpload(code, body))
 
-  trait AsThrowable extends UploadErr[Throwable] {
+  trait AsThrowable extends AppErr[Throwable] {
     def downloadMoreLines(code: StatusCode) =
       new RuntimeException(s"not all entries could be processed, download more lines, http code: $code")
 
@@ -121,7 +121,7 @@ object UploadErr extends Constructors[UploadErr] {
     def message(message: String) = new RuntimeException(message)
   }
 
-  trait AsString extends UploadErr[String] {
+  trait AsString extends AppErr[String] {
     def downloadMoreLines(code: StatusCode) =
       (s"not all entries could be processed, download more lines, http code: $code")
 

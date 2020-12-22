@@ -30,37 +30,37 @@ object Sttp {
 }
 
 @accessible
-trait Downloader {
+trait DownloadApi {
   def download: IO[Capture[HttpErr], (StatusCode, Stream[Throwable, Byte])]
 }
 
-object Downloader {
+object DownloadApi {
   val make = for {
-    implicit0(sttpBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.asyncBackend
+    implicit0(asyncBackend: SttpBackend[Task, Stream[Throwable, Byte], NothingT]) <- Sttp.asyncBackend
     cfg <- ZIO.service[AppCfg]
-    downloadRequest <- HttpRequests.downloadRequest
-  } yield new Downloader {
+    downloadReq <- HttpRequests.downloadReq
+  } yield new DownloadApi {
     val download =
-      downloadRequest
+      downloadReq
         .send()
         .bimap(throwable(s"httpRequest.send ${cfg.downloadUrl}"), r => r.code -> r.body)
   }
 }
 
 @accessible
-trait Uploader {
+trait UploadApi {
   def upload(bytes: Stream[Throwable, Byte]): IO[Capture[HttpErr], (StatusCode, Either[String, String])]
 }
 
-object Uploader {
+object UploadApi {
   val make = for {
-    implicit0(sttpBackend: SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]) <- Sttp.noContentTypeCharsetBackend
+    implicit0(blockingBackend: SttpBackend[BlockingTask, ZStream[Blocking, Throwable, Byte], NothingT]) <- Sttp.noContentTypeCharsetBackend
     env <- ZIO.environment[Blocking]
-    uploadRequest <- HttpRequests.uploadRequest
-  } yield new Uploader {
+    uploadReq <- HttpRequests.uploadReq
+  } yield new UploadApi {
     def upload(bytes: Stream[Throwable, Byte]) =
       (for {
-        res <- uploadRequest
+        res <- uploadReq
           .streamBody(bytes)
           .send()
           .bimap(throwable("uploadRequest.send"), r => r.code -> r.body)
@@ -70,21 +70,21 @@ object Uploader {
 
 @accessible
 trait HttpRequests {
-  def downloadRequest: UIO[RequestT[Identity, Stream[Throwable, Byte], Stream[Throwable, Byte]]]
+  def downloadReq: UIO[RequestT[Identity, Stream[Throwable, Byte], Stream[Throwable, Byte]]]
 
-  def uploadRequest: UIO[RequestT[Identity, Either[String, String], Nothing]]
+  def uploadReq: UIO[RequestT[Identity, Either[String, String], Nothing]]
 }
 
 object HttpRequests {
   def make(cfg: AppCfg) =
     new HttpRequests {
-      val downloadRequest = IO.succeed {
+      val downloadReq = IO.succeed {
         basicRequest
           .get(uri"${cfg.downloadUrl}/${cfg.downloadLines}")
           .response(ResponseAsStream[Stream[Throwable, Byte], Stream[Throwable, Byte]]())
           .readTimeout(cfg.requestTimeout)
       }
-      val uploadRequest = IO.succeed {
+      val uploadReq = IO.succeed {
         basicRequest
           .put(uri"${cfg.uploadUrl}/${cfg.downloadLines}")
           .contentType(MediaType.TextCsv)

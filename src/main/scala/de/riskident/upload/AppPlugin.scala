@@ -18,14 +18,14 @@ object AppPlugin extends PluginDef with ConfigModuleDef with ZIODIEffectModule {
   make[Sttp].fromHas(Sttp.make)
   make[HttpRequests].from(HttpRequests.make _)
 
-  make[Downloader].fromHas(Downloader.make)
-  make[Uploader].fromHas(Uploader.make)
+  make[DownloadApi].fromHas(DownloadApi.make)
+  make[UploadApi].fromHas(UploadApi.make)
   make[AppLogic].fromHas(AppLogic.make)
 
   makeConfig[AppCfg]("app")
   make[Task[Unit]].from(provideHas(
     program
-      .mapError(_ continue new HttpErr.AsThrowable with UploadErr.AsThrowable {})
+      .mapError(_ continue new HttpErr.AsThrowable with AppErr.AsThrowable {})
       .provide
   ))
 }
