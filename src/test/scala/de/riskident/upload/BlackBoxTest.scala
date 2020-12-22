@@ -18,7 +18,7 @@ abstract class BlackBoxTest extends DistageBIOEnvSpecScalatest[ZIO] with Matcher
     "successfully download and upload all entries" in {
       (for {
         res <- AppLogic.downloadUpload
-        _ = assert(res === Chunk.single("Finished reading data, result is correct"))
+        _ = assert(res.right.value.toList === List("Finished reading data, result is correct"))
       } yield ())
         .mapError(_ continue new AppErr.AsString with HttpErr.AsString {})
     }

@@ -16,7 +16,7 @@ import zio.stream.{Stream, ZStream, ZTransducer}
 
 @accessible
 trait AppLogic {
-  def downloadUpload: IO[Capture[AppErr with HttpErr], Chunk[String]]
+  def downloadUpload: IO[Capture[AppErr with HttpErr], Either[String, Chunk[String]]]
 }
 
 object AppLogic {
@@ -89,7 +89,7 @@ object AppLogic {
         (code, uploadResp) <- UploadApi.upload(byteStream)
         _ <- IO.fail(failedUpload(code, uploadResp.merge))
           .when(!code.isSuccess)
-      } yield Chunk.single(uploadResp.merge)) provide env
+      } yield uploadResp.map(Chunk.single)) provide env
   }
 }
 
